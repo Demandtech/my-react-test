@@ -1,141 +1,164 @@
 export default function MkdSDK() {
-	this._baseurl = "https://reacttask.mkdlabs.com";
-	this._project_id = "reacttask";
-	this._secret = "d9hedycyv6p7zw8xi34t9bmtsjsigy5t7";
-	this._table = "";
-	this._custom = "";
-	this._method = "";
+  this._baseurl = "https://reacttask.mkdlabs.com";
+  this._project_id = "reacttask";
+  this._secret = "d9hedycyv6p7zw8xi34t9bmtsjsigy5t7";
+  this._table = "";
+  this._custom = "";
+  this._method = "";
 
-	const raw = this._project_id + ":" + this._secret;
-	let base64Encode = btoa(raw);
+  const raw = this._project_id + ":" + this._secret;
+  let base64Encode = btoa(raw);
 
-	this.setTable = function (table) {
-		this._table = table;
-	};
+  this.setTable = function (table) {
+    this._table = table;
+  };
 
-	this.login = async function (email, password, role) {
-		//TODO
-		const payload = {
-			email,
-			password,
-			role,
-		};
+  this.login = async function (email, password, role) {
+    //TODO
+    const payload = { email, password, role };
 
-		try {
-			const headers = {
-				"Content-Type": "application/json",
-				"x-project": base64Encode,
-			};
+    try {
+      const headers = {
+        "Content-Type": "application/json",
+        "x-project": base64Encode,
+      };
 
-			const loginResult = await fetch(`${this._baseurl}/v2/api/lambda/login`, {
-				method: "POST",
-				headers,
-				body: JSON.stringify(payload),
-			});
+      const response = await fetch(`${this._baseurl}/v2/api/lambda/login`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+      });
 
-			const jsonLoginResult = await loginResult.json();
+      if (!response.ok) {
+        const errorMessage = `Error: ${response.status} - ${response.statusText}`;
+        console.error(errorMessage);
+        throw new Error(errorMessage);
+      }
 
-			localStorage.setItem("token", jsonLoginResult.token);
-			localStorage.setItem("role", jsonLoginResult.role);
+      const jsonResponse = await response.json();
 
-			return jsonLoginResult;
-		} catch (error) {
-			console.log(error);
-		}
-	};
+      if (!jsonResponse.token || !jsonResponse.role) {
+        const errorMessage = "Invalid response: Missing token or role.";
+        console.error(errorMessage);
+        throw new Error(errorMessage);
+      }
 
-	this.getHeader = function () {
-		return {
-			Authorization: "Bearer " + localStorage.getItem("token"),
-			"x-project": base64Encode,
-		};
-	};
+      localStorage.setItem("token", jsonResponse.token);
+      localStorage.setItem("role", jsonResponse.role);
 
-	this.baseUrl = function () {
-		return this._baseurl;
-	};
+      return jsonResponse;
+    } catch (error) {
+      console.log(error);
+      console.error("Login failed: ", error.message);
+      throw error;
+    }
+  };
 
-	this.callRestAPI = async function (payload, method) {
-		const header = {
-			"Content-Type": "application/json",
-			"x-project": base64Encode,
-			Authorization: "Bearer " + localStorage.getItem("token"),
-		};
+  this.getHeader = function () {
+    return {
+      Authorization: "Bearer " + localStorage.getItem("token"),
+      "x-project": base64Encode,
+    };
+  };
 
-		switch (method) {
-			case "GET":
-				const getResult = await fetch(
-					this._baseurl + `/v1/api/rest/${this._table}/GET`,
-					{
-						method: "post",
-						headers: header,
-						body: JSON.stringify(payload),
-					}
-				);
-				const jsonGet = await getResult.json();
+  this.baseUrl = function () {
+    return this._baseurl;
+  };
 
-				if (getResult.status === 401) {
-					throw new Error(jsonGet.message);
-				}
+  this.callRestAPI = async function (payload, method) {
+    const header = {
+      "Content-Type": "application/json",
+      "x-project": base64Encode,
+      Authorization: "Bearer " + localStorage.getItem("token"),
+    };
 
-				if (getResult.status === 403) {
-					throw new Error(jsonGet.message);
-				}
-				return jsonGet;
+    switch (method) {
+      case "GET":
+        const getResult = await fetch(
+          this._baseurl + `/v1/api/rest/${this._table}/GET`,
+          {
+            method: "post",
+            headers: header,
+            body: JSON.stringify(payload),
+          }
+        );
+        const jsonGet = await getResult.json();
 
-			case "PAGINATE":
-				if (!payload.page) {
-					payload.page = 1;
-				}
-				if (!payload.limit) {
-					payload.limit = 10;
-				}
-				const paginateResult = await fetch(
-					this._baseurl + `/v1/api/rest/video/${method}`,
-					{
-						method: "post",
-						headers: header,
-						body: JSON.stringify(payload),
-					}
-				);
+        if (getResult.status === 401) {
+          throw new Error(jsonGet.message);
+        }
 
-				const jsonPaginate = await paginateResult.json();
+        if (getResult.status === 403) {
+          throw new Error(jsonGet.message);
+        }
+        return jsonGet;
 
-				if (paginateResult.status === 401) {
-					throw new Error(jsonPaginate.message);
-				}
+      case "PAGINATE":
+        if (!payload.page) {
+          payload.page = 1;
+        }
+        if (!payload.limit) {
+          payload.limit = 10;
+        }
+        const paginateResult = await fetch(
+          this._baseurl + `/v1/api/rest/video/${method}`,
+          {
+            method: "post",
+            headers: header,
+            body: JSON.stringify(payload),
+          }
+        );
 
-				if (paginateResult.status === 403) {
-					throw new Error(jsonPaginate.message);
-				}
-				return jsonPaginate;
-			default:
-				break;
-		}
-	};
+        const jsonPaginate = await paginateResult.json();
 
-	this.check = async function (role) {
-		//TODO
+        if (paginateResult.status === 401) {
+          throw new Error(jsonPaginate.message);
+        }
 
-		const header = this.getHeader();
+        if (paginateResult.status === 403) {
+          throw new Error(jsonPaginate.message);
+        }
+        return jsonPaginate;
+      default:
+        break;
+    }
+  };
 
-		try {
-			const response = await fetch(`${this._baseurl}/v2/api/lambda/check`, {
-				method: "POST",
-				body: JSON.stringify({ role }),
-				headers: {
-					...header,
-					"Content-Type": "application/json",
-				},
-			});
+  this.check = async function (role) {
+	// TODO
+    const headers = this.getHeader(); 
+    try {
+        const response = await fetch(`${this._baseurl}/v2/api/lambda/check`, {
+            method: "POST",
+            headers: {
+                ...headers,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ role }),
+        });
 
-			const checkResult = await response.json();
+        if (!response.ok) {
+            const errorMessage = `Error: ${response.status} - ${response.statusText}`;
+            console.error(errorMessage);
+            throw new Error(errorMessage);
+        }
 
-			return checkResult;
-		} catch (error) {
-			console.error(error);
-		}
-	};
+        const checkResult = await response.json();
 
-	return this;
+        if (!checkResult || typeof checkResult !== 'object') {
+            const errorMessage = "Invalid response: Expected an object.";
+            console.error(errorMessage);
+            throw new Error(errorMessage);
+        }
+
+        return checkResult;
+    } catch (error) {
+      
+        console.error("Check operation failed: ", error.message);
+        throw error;
+    }
+};
+
+
+  return this;
 }
